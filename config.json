@@ -1,124 +1,63 @@
 {
-  "_README": "Tailored for IT Leadership, Video Game Studio Management, and Technical Product roles across 3-5 resumes.",
-
   "profile": {
-    "title": "IT Leadership & Game Studio Job Tracker",
-    "subtitle": "Director of IT · Game Studio IT · Technical Product / Ops",
-    "emoji": "🎮"
+    "title": "IT Leadership Job Tracker",
+    "subtitle": "Remote · USA",
+    "emoji": "🖥️"
   },
-
   "keywords": {
-    "_comment": "Job titles matching any of these terms are kept. Case-insensitive.",
-    "include": [
-      "director of it", "director, it", "director of technology", "director, technology",
-      "it director", "technology director", "head of it", "head of technology",
-      "it manager", "it operations manager",
-      "associate product manager", "product manager", "technical product manager",
-      "studio infrastructure", "studio technology", "game studio IT",
-      "it service delivery manager", "it infrastructure director", "senior IT manager"
-    ],
-    "_exclude_comment": "Titles containing these junior or unrelated roles will be filtered out.",
-    "exclude": [
-      "intern", "internship", "co-op", "trainee", "apprentice", "technician",
-      "helpdesk technician", "desktop support tech", "tier 1", "tier 1 support",
-      "junior", "associate developer", "student", "volunteer"
-    ],
-    "fuzzy_seniority": [],
-    "fuzzy_domain": [],
-    "fuzzy_exclude": []
+    "include": [ "it director", "director of it", "director of information technology", "director, information technology", "information technology director", "director of technology", "director of it operations", "director of it infrastructure", "director of it services", "director of technology operations", "it operations director", "it infrastructure director", "it service delivery director", "director of enterprise systems", "director of business systems", "head of it", "head of information technology", "head of technology", "vp of it", "vp of information technology", "vice president of it", "vice president of information technology", "chief information officer", "deputy cio", "it manager", "it operations manager", "it infrastructure manager", "it service delivery manager", "it service manager", "itsm manager", "it business operations manager", "it program manager", "it project manager", "it portfolio manager", "it governance manager", "it vendor manager", "it asset manager", "it risk manager", "it security manager", "it compliance manager", "it procurement manager", "it strategy manager", "information technology manager", "information technology operations manager", "technology operations manager", "technology program manager", "technical program manager", "service delivery manager", "enterprise systems manager", "enterprise applications manager", "business systems manager", "corporate systems manager", "microsoft 365 manager", "cloud operations manager", "ai governance manager" ],
+    "exclude": [ "intern", "internship", "co-op", "trainee", "apprentice", "junior", "entry level", "entry-level", "help desk", "helpdesk", "service desk analyst", "desktop support", "field technician", "technician", "software engineer", "software developer", "data scientist", "data engineer", "machine learning", "sales", "account executive", "recruiter", "nurse", "clinical", "construction", "mechanical", "electrical", "civil", "manufacturing", "warehouse", "retail", "store manager", "restaurant", "hotel", "real estate", "financial advisor", "teacher", "professor", "driver" ]
   },
-
   "search_terms": {
-    "_comment": "Search strings sent directly to job board APIs.",
-    "linkedin": [
-      "Director of IT", "IT Manager", "Director of Technology", 
-      "Associate Product Manager", "Game Studio IT Manager", "Head of IT"
-    ],
-    "indeed": [
-      "Director of IT", "IT Manager", "Director of Technology", "Associate Product Manager"
-    ],
-    "glassdoor": [
-      "Director of IT", "IT Manager", "Director of Technology", "Associate Product Manager"
-    ],
-    "ziprecruiter": [
-      "Director of IT", "IT Manager", "Director of Technology", "Associate Product Manager"
-    ],
-    "google_jobs": [
-      "Director of IT", "IT Manager", "Director of Technology", "Associate Product Manager"
-    ],
-    "hiring_cafe": [
-      "Director of IT", "IT Manager", "Director of Technology", "Associate Product Manager"
-    ],
-    "workday": [
-      "Director of IT", "IT Manager", "Director of Technology"
-    ]
+    "linkedin": [ "IT Director", "Director of IT", "Director of Information Technology", "Director of Technology", "Head of IT", "VP of IT", "IT Operations Director", "IT Infrastructure Director", "IT Operations Manager", "IT Manager", "IT Service Delivery Manager", "ITSM Manager", "IT Program Manager", "IT Project Manager", "IT Governance Manager", "IT Vendor Manager", "IT Asset Manager", "Technology Operations Manager", "Technical Program Manager", "Enterprise Systems Manager", "Business Systems Manager", "Microsoft 365 Manager", "AI Governance Manager", "Service Delivery Manager", "Chief Information Officer" ],
+    "indeed":   [ "IT Director", "Director of Information Technology", "IT Operations Manager", "IT Manager", "IT Program Manager", "IT Service Delivery Manager", "Head of IT", "Technology Operations Manager", "IT Infrastructure Manager" ],
+    "glassdoor": [ "IT Director", "Director of Information Technology", "IT Operations Manager", "IT Manager", "IT Program Manager", "Service Delivery Manager", "Head of IT", "Technology Operations Manager" ],
+    "ziprecruiter": [ "IT Director", "Director of Information Technology", "IT Operations Manager", "IT Manager", "IT Program Manager", "Service Delivery Manager", "Head of IT", "Technology Operations Manager" ],
+    "google_jobs": [ "IT Director remote", "Director of Information Technology remote", "IT Operations Manager remote", "IT Manager remote", "IT Program Manager remote", "Service Delivery Manager remote", "Head of IT remote", "Technology Operations Manager remote" ],
+    "hiring_cafe": [ "IT Director", "Director of Information Technology", "IT Operations Manager", "IT Manager", "IT Program Manager", "Service Delivery Manager", "Head of IT", "Technology Operations Manager" ]
   },
-
   "locations": {
-    "linkedin": [
-      { "name": "United States", "location": "United States", "geoId": "103644278" },
-      { "name": "Remote", "location": "Remote", "geoId": "" }
-    ],
-    "indeed": [
-      { "location": "Remote", "country": "USA" },
-      { "location": "United States", "country": "USA" }
-    ],
-    "glassdoor": [
-      { "location": "Remote", "country": "USA" },
-      { "location": "United States", "country": "USA" }
-    ],
-    "ziprecruiter": [
-      { "location": "Remote", "country": "USA" }
-    ],
-    "google_jobs": [
-      { "location": "Remote", "country": "USA" },
-      { "location": "United States", "country": "USA" }
-    ],
-    "hiring_cafe": [
-      { "location": "United States" }
-    ]
+    "linkedin": [ { "name": "Remote (USA)", "location": "United States", "geoId": "" } ],
+    "indeed":   [ { "location": "Remote", "country": "USA" } ],
+    "glassdoor": [ { "location": "Remote", "country": "USA" } ],
+    "ziprecruiter": [ { "location": "Remote", "country": "USA" } ],
+    "google_jobs": [ { "location": "United States", "country": "USA" } ],
+    "hiring_cafe": [ { "location": "United States" } ]
   },
-
-  "location_filter": {
-    "terms": [
-      "remote", "united states", "usa", "us"
-    ]
+  "google_jobs": {
+    "queries": [],
+    "serpapi_api_key": "",
+    "oxylabs_username": "",
+    "oxylabs_password": ""
   },
-
+  "hiring_cafe": {
+    "max_pages": 3
+  },
   "employers": {
-    "_priority_comment": "Target companies (e.g., video game studios and top tech firms) highlighted in daily reports.",
-    "priority": [
-      "Riot Games", "Bungie", "Epic Games", "Blizzard Entertainment", "EA", "Electronic Arts",
-      "Take-Two Interactive", "Ubisoft", "Sony Interactive Entertainment", "Xbox", "Microsoft",
-      "Respawn Entertainment", "Insomniac Games", "Naughty Dog", "2K", "Bethesda"
-    ],
-    "exclude": []
+    "priority": [],
+    "exclude":  []
   },
-
   "priority_topics": {
-    "_comment": "Key terms touching your specific technical strengths get a gold star.",
     "terms": [
-      ["Game Studio / Gaming", "gaming|game studio|publisher|interactive entertainment"],
-      ["Infrastructure / Cloud", "infrastructure|aws|cloud|active directory|network"],
-      ["Leadership / Strategy", "director|head of|roadmap|vendor management|budget"]
+      [ "ITSM / ITIL", "itsm|\\bitil\\b|service management|service delivery" ],
+      [ "AI Governance & Risk", "\\bai\\b.*(governance|risk|policy|security)|governance.*\\bai\\b" ],
+      [ "Microsoft 365 / Azure", "microsoft 365|\\bm365\\b|office 365|\\bazure\\b|power platform|power automate" ],
+      [ "Vendor & Contract Mgmt", "vendor|contract|procurement|sourcing|license|asset management" ],
+      [ "Security & Risk", "security|risk|compliance|governance|clearance" ],
+      [ "Automation & Process", "automation|process improvement|workflow|power apps|powerapps" ]
     ]
   },
-
   "role_categories": {
-    "_comment": "Dashboard filters corresponding to your 3-5 target resume personas.",
     "terms": [
-      ["IT Executive", "director|head of it|head of technology"],
-      ["IT Management", "it manager|it operations|infrastructure manager"],
-      ["Product Management", "product manager|associate product manager|tpm"],
-      ["Gaming & Studio Ops", "studio|gaming|game"]
+      [ "Executive / Head of IT", "chief information officer|\\bcio\\b|\\bvp\\b|vice president|head of (it|information technology|technology)|deputy cio" ],
+      [ "IT Director", "director.*(it|information technology|technology|infrastructure|systems|operations)|(it|information technology|technology) director" ],
+      [ "IT Operations Manager", "(it|information technology|technology) operations|operations manager.*(it|technology)" ],
+      [ "Infrastructure / Cloud", "infrastructure|cloud|microsoft 365|\\bm365\\b|systems manager|enterprise systems" ],
+      [ "Service Delivery / ITSM", "service delivery|service manager|itsm|service management" ],
+      [ "Program / Project Mgmt", "program manager|project manager|portfolio|technical program" ],
+      [ "Governance / Risk / Vendor", "governance|compliance|risk|vendor|procurement|asset manager|sourcing" ],
+      [ "IT Manager (General)", "\\bit manager\\b|information technology manager|business systems|enterprise applications" ]
     ]
   },
-
-  "notify": {
-    "min_fit": 75,
-    "weekly_digest": {
-      "enabled": false,
-      "days": 7
-    }
-  }
+  "notify": { "min_fit": 75 }
 }
