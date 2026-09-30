@@ -25,6 +25,7 @@ import urllib.request
 from datetime import datetime, timedelta, timezone
 from urllib.request import urlopen, Request
 from urllib.error import HTTPError, URLError
+from evaluator import process_and_score_jobs
 
 if hasattr(sys.stdout, "reconfigure"):
     sys.stdout.reconfigure(encoding="utf-8", errors="replace")
@@ -3748,4 +3749,6 @@ if __name__ == "__main__":
     all_jobs = [j for j in all_jobs if is_recent_posting(j)]
     print(f"🕒 Freshness filter (last 24h): {before} → {len(all_jobs)} roles")
 
+    all_jobs = process_and_score_jobs(all_jobs)
+    
     save_results(all_jobs)
