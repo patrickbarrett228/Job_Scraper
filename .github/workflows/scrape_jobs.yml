@@ -16,7 +16,7 @@ on:
 
 concurrency:
   group: job-scraper-commit-push
-  cancel-in-progress: false
+  cancel-in-progress: true
 
 jobs:
   scrape:
