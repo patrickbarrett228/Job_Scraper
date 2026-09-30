@@ -1,0 +1,750 @@
+"""
+Pipelines include LinkedIn's guest endpoint, JobSpy-backed Indeed/Glassdoor,
+public-sector boards, and a priority-employer sweep (allowlist-filtered LinkedIn
++ direct Greenhouse/Workday probes). Each writes output files and scores
+jobs against multiple resumes using Google's free Gemini API.
+
+Tune the search in config.json: title keywords, board-specific search terms,
+priority employers, locations, and LinkedIn geoIds / JobSpy locations.
+"""
+
+import http.cookiejar
+import base64
+import json
+import os
+import random
+import re
+import shutil
+import subprocess
+import sys
+import time
+import urllib.error
+import urllib.parse
+import urllib.request
+from datetime import datetime, timedelta, timezone
+from urllib.request import urlopen, Request
+from urllib.error import HTTPError, URLError
+
+if hasattr(sys.stdout, "reconfigure"):
+    sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+    sys.stderr.reconfigure(encoding="utf-8", errors="replace")
+
+SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
+OUTPUT_DIR = os.path.join(SCRIPT_DIR, "output")
+os.makedirs(OUTPUT_DIR, exist_ok=True)
+
+HEADERS = {
+    "User-Agent": (
+        "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 "
+        "(KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+    )
+}
+
+# ---------------------------------------------------------------------------
+# Config Management
+# ---------------------------------------------------------------------------
+
+def _read_json(path: str) -> dict | None:
+    try:
+        with open(path, encoding="utf-8") as f:
+            return json.load(f)
+    except FileNotFoundError:
+        return None
+    except (json.JSONDecodeError, OSError) as e:
+        print(f"  ⚠️  {os.path.basename(path)} not loaded ({e})")
+        return None
+
+
+def _deep_merge(base: dict, override: dict) -> dict:
+    merged = dict(base)
+    for key, value in override.items():
+        if isinstance(value, dict) and isinstance(merged.get(key), dict):
+            merged[key] = _deep_merge(merged[key], value)
+        else:
+            merged[key] = value
+    return merged
+
+
+def _load_config() -> dict:
+    base = _read_json(os.path.join(SCRIPT_DIR, "config.example.json")) or {}
+    user = _read_json(os.path.join(SCRIPT_DIR, "config.json"))
+    if user is None:
+        if not base:
+            sys.exit(
+                "  ⛔ No usable config found (config.json and config.example.json are "
+                "both missing or unparseable). Copy config.example.json to config.json, "
+                "or fix its JSON syntax, and re-run."
+            )
+        print("  ℹ️  config.json not found; using config.example.json as-is "
+              "(copy it to config.json and customize)")
+        return base
+    if not base:
+        print("  ⚠️  config.example.json not loaded; using config.json only "
+              "(newer optional keys may be missing)")
+        return user
+    return _deep_merge(base, user)
+
+
+CONFIG = _load_config()
+
+
+def _cfg(path: str, default):
+    """Nested config lookup by dotted path; returns default if absent/empty."""
+    cur = CONFIG
+    for key in path.split("."):
+        if not isinstance(cur, dict) or key not in cur:
+            return default
+        cur = cur[key]
+    return cur if cur not in (None, "", [], {}) else default
+
+
+PROFILE_LABEL = re.sub(
+    r'\s*(job\s*tracker|tracker|jobs?)\s*$', '',
+    str(_cfg("profile.title", "Job")), flags=re.I).strip() or "Job"
+PROFILE_SUBTITLE = str(_cfg("profile.subtitle", "All locations"))
+
+KEYWORDS = _cfg("keywords.include", [])
+
+REQUEST_DELAY = 0.3
+LINKEDIN_REQUEST_DELAY = 3.0
+FRESH_JOB_LOOKBACK = timedelta(hours=24)
+
+
+def _build_title_re(terms: list) -> re.Pattern:
+    return re.compile(
+        "|".join(re.escape(t) if (" " in t or "&" in t) else rf"\b{re.escape(t)}\b" for t in terms),
+        re.IGNORECASE,
+    )
+
+
+EXCLUDED_SENIORITY_RE = _build_title_re(_cfg("keywords.exclude", []))
+
+_KEYWORD_RE = re.compile(
+    "|".join(
+        re.escape(k) if " " in k else rf"\b{re.escape(k)}\b"
+        for k in KEYWORDS
+    ),
+    re.IGNORECASE,
+)
+
+_FUZZY_SENIORITY = _cfg("keywords.fuzzy_seniority", [])
+_FUZZY_DOMAIN = _cfg("keywords.fuzzy_domain", [])
+_FUZZY_EXCLUDE = _cfg("keywords.fuzzy_exclude", [])
+_FUZZY_ENABLED = bool(_FUZZY_SENIORITY) and bool(_FUZZY_DOMAIN)
+
+
+def _build_word_re(terms: list[str]) -> re.Pattern | None:
+    if not terms:
+        return None
+    return re.compile(
+        rf"\b(?:{'|'.join(re.escape(t) for t in terms)})\b",
+        re.IGNORECASE,
+    )
+
+
+_SENIORITY_RE = _build_word_re(_FUZZY_SENIORITY)
+_DOMAIN_RE = _build_word_re(_FUZZY_DOMAIN)
+_FUZZY_EXCLUDE_RE = _build_word_re(_FUZZY_EXCLUDE)
+_SR_MGR_RE = re.compile(
+    r"\b(?:senior|sr)\b.*\bmanager\b|\bmanager\b.*\b(?:senior|sr)\b",
+    re.IGNORECASE,
+)
+_HEAD_OF_RE = re.compile(r"\bhead\s+of\b", re.IGNORECASE)
+
+
+def role_is_relevant(title: str, company: str = "") -> bool:
+    if not title:
+        return False
+    if EXCLUDED_SENIORITY_RE.search(title):
+        return False
+    if not _FUZZY_ENABLED:
+        return bool(_KEYWORD_RE.search(title))
+    if _FUZZY_EXCLUDE_RE and _FUZZY_EXCLUDE_RE.search(title):
+        return False
+    if _SENIORITY_RE.search(title) and _DOMAIN_RE.search(title):
+        return True
+    if _SR_MGR_RE.search(title) and _DOMAIN_RE.search(title):
+        return True
+    if _HEAD_OF_RE.search(title) and (_DOMAIN_RE.search(title) or _is_priority_company(company)):
+        return True
+    if _SENIORITY_RE.search(title) and _is_priority_company(company):
+        return True
+    return False
+
+
+# ---------------------------------------------------------------------------
+# Helpers
+# ---------------------------------------------------------------------------
+
+_RATE_LIMITED = False
+
+
+def fetch(url, *, retries=4, _base_wait=30.0):
+    global _RATE_LIMITED
+    req = Request(url, headers=HEADERS)
+    for attempt in range(retries + 1):
+        try:
+            with urlopen(req, timeout=15) as r:
+                return r.read().decode("utf-8", errors="ignore")
+        except HTTPError as e:
+            if e.code == 429 and attempt < retries:
+                _RATE_LIMITED = True
+                wait = _base_wait * (2 ** attempt) + random.uniform(0, 15)
+                print(f"  ⏳ Rate-limited (429) on attempt {attempt + 1}/{retries + 1}; waiting {wait:.0f}s then retrying…")
+                time.sleep(wait)
+                continue
+            print(f"  WARNING: Could not fetch {url}: {e}")
+            return ""
+        except (URLError, TimeoutError, OSError) as e:
+            print(f"  WARNING: Could not fetch {url}: {e}")
+            return ""
+    return ""
+
+
+def title_matches_keywords(title: str) -> bool:
+    if EXCLUDED_SENIORITY_RE.search(title):
+        return False
+    return bool(_KEYWORD_RE.search(title))
+
+
+def text_matches_keywords(title: str, *parts: str) -> bool:
+    if EXCLUDED_SENIORITY_RE.search(title or ""):
+        return False
+    text = " ".join([title or "", *(p or "" for p in parts)])
+    return bool(_KEYWORD_RE.search(text))
+
+
+TARGET_LOCATIONS = [str(t).lower() for t in _cfg("location_filter.terms", [])]
+
+NON_US_COUNTRIES_MULTI = [
+    "united kingdom", "south korea", "south africa", "new zealand",
+    "saudi arabia", "united arab emirates",
+]
+NON_US_COUNTRIES_SINGLE = [
+    "canada", "australia", "uk", "england", "scotland",
+    "wales", "ireland", "germany", "france", "netherlands", "switzerland",
+    "sweden", "norway", "denmark", "finland", "spain", "portugal", "italy",
+    "india", "singapore", "japan", "china", "brazil",
+    "mexico", "argentina", "belgium",
+    "austria", "poland", "czech", "romania", "hungary", "israel",
+    "qatar", "egypt",
+]
+_NON_US_COUNTRY_RE = re.compile(
+    r'\b(?:' + '|'.join(re.escape(c) for c in NON_US_COUNTRIES_SINGLE) + r')\b'
+)
+
+_US_STATE_NAMES = [
+    "alabama", "alaska", "arizona", "arkansas", "california", "colorado",
+    "connecticut", "delaware", "florida", "georgia", "hawaii", "idaho",
+    "illinois", "indiana", "iowa", "kansas", "kentucky", "louisiana",
+    "maine", "maryland", "massachusetts", "michigan", "minnesota",
+    "mississippi", "missouri", "montana", "nebraska", "nevada",
+    "new hampshire", "new jersey", "new mexico", "new york",
+    "north carolina", "north dakota", "ohio", "oklahoma", "oregon",
+    "pennsylvania", "rhode island", "south carolina", "south dakota",
+    "tennessee", "texas", "utah", "vermont", "virginia", "washington",
+    "west virginia", "wisconsin", "wyoming",
+]
+
+
+def is_target_location(location: str) -> bool:
+    if not location:
+        return False
+    loc = location.lower()
+    if any(state in loc for state in _US_STATE_NAMES):
+        return True
+    if any(country in loc for country in NON_US_COUNTRIES_MULTI):
+        return False
+    if _NON_US_COUNTRY_RE.search(loc):
+        return False
+    return any(place in loc for place in TARGET_LOCATIONS)
+
+
+def _parse_posted_at(value: str, *, now: datetime | None = None) -> datetime | None:
+    if now is None:
+        now = datetime.now(timezone.utc)
+    elif now.tzinfo is None:
+        now = now.replace(tzinfo=timezone.utc)
+    else:
+        now = now.astimezone(timezone.utc)
+
+    raw = (value or "").strip()
+    if not raw:
+        return None
+
+    text = re.sub(r'\s+', ' ', raw).strip().lower()
+    text = text.removeprefix("posted ").strip()
+
+    if text in {"today", "just posted", "just now"}:
+        return now
+
+    relative_m = re.search(
+        r'(\d+)\s*(minutes?|mins?|hours?|hrs?)\b(?:\s*ago)?',
+        text,
+    )
+    if relative_m:
+        amount = int(relative_m.group(1))
+        unit = relative_m.group(2)
+        if unit.startswith(("minute", "min")):
+            return now - timedelta(minutes=amount)
+        return now - timedelta(hours=amount)
+
+    iso_value = raw.replace("Z", "+00:00")
+    try:
+        if re.fullmatch(r'\d{4}-\d{2}-\d{2}', iso_value):
+            parsed = datetime.strptime(iso_value, "%Y-%m-%d").replace(tzinfo=timezone.utc)
+        else:
+            parsed = datetime.fromisoformat(iso_value)
+            if parsed.tzinfo is None:
+                parsed = parsed.replace(tzinfo=timezone.utc)
+            else:
+                parsed = parsed.astimezone(timezone.utc)
+        return parsed
+    except ValueError:
+        return None
+
+
+def is_recent_posting(job: dict, *, now: datetime | None = None) -> bool:
+    posted_at = _parse_posted_at(job.get("date_posted", ""), now=now)
+    if posted_at is None:
+        return False
+    if now is None:
+        now = datetime.now(timezone.utc)
+    elif now.tzinfo is None:
+        now = now.replace(tzinfo=timezone.utc)
+    else:
+        now = now.astimezone(timezone.utc)
+    return timedelta(0) <= now - posted_at <= FRESH_JOB_LOOKBACK
+
+
+# ---------------------------------------------------------------------------
+# Direct ATS Probes (Greenhouse / Workday)
+# ---------------------------------------------------------------------------
+
+CURATED_EMPLOYERS: list[dict] = []
+
+
+def probe_curated_greenhouse(entry: dict) -> list:
+    time.sleep(REQUEST_DELAY)
+    url = f"https://boards-api.greenhouse.io/v1/boards/{entry['slug']}/jobs?content=true"
+    raw = fetch(url)
+    if not raw:
+        return []
+    try:
+        data = json.loads(raw)
+    except json.JSONDecodeError:
+        return []
+    jobs = []
+    for job in data.get("jobs", []):
+        title = job.get("title", "")
+        if not title_matches_keywords(title):
+            continue
+        loc = (job.get("location") or {}).get("name", "") or entry["fallback_location"]
+        jobs.append({
+            "company": entry["name"],
+            "title": title,
+            "location": loc,
+            "url": job.get("absolute_url", f"https://boards.greenhouse.io/{entry['slug']}"),
+            "date_posted": (job.get("updated_at") or "")[:10],
+            "ats": "Greenhouse",
+        })
+    return jobs
+
+
+WORKDAY_SEARCH_TERMS = _cfg("search_terms.workday", [])
+
+
+def probe_curated_workday(entry: dict) -> list:
+    domain_m = re.match(r'https://([^/]+)', entry["url"])
+    domain = domain_m.group(1) if domain_m else ""
+    site_m = re.search(r'/wday/cxs/[^/]+/([^/]+)/jobs', entry["url"])
+    site = site_m.group(1) if site_m else ""
+
+    seen: dict[str, dict] = {}
+    for term in WORKDAY_SEARCH_TERMS:
+        time.sleep(REQUEST_DELAY)
+        body = json.dumps({"appliedFacets": {}, "limit": 20, "offset": 0, "searchText": term}).encode()
+        try:
+            req = Request(
+                entry["url"],
+                data=body,
+                headers={**HEADERS, "Content-Type": "application/json", "Accept": "application/json"},
+            )
+            with urlopen(req, timeout=15) as r:
+                data = json.loads(r.read().decode("utf-8", errors="ignore"))
+        except (URLError, TimeoutError, OSError, json.JSONDecodeError) as e:
+            print(f"  ⚠️  Workday {entry['name']} ({term!r}): {e}")
+            continue
+
+        for posting in data.get("jobPostings", []):
+            ext_path = posting.get("externalPath", "")
+            if ext_path in seen:
+                continue
+            title = posting.get("title", "")
+            if not title_matches_keywords(title):
+                continue
+            public_url = f"https://{domain}/{site}{ext_path}" if ext_path else entry["url"]
+            loc = posting.get("locationsText", "") or entry["fallback_location"]
+            if re.match(r'^\d+ Locations?$', loc):
+                loc = entry["fallback_location"]
+            seen[ext_path] = {
+                "company": entry["name"],
+                "title": title,
+                "location": loc,
+                "url": public_url,
+                "date_posted": posting.get("postedOn") or "",
+                "ats": "Workday",
+            }
+    return list(seen.values())
+
+
+def scrape_curated_employers() -> list:
+    if not CURATED_EMPLOYERS:
+        return []
+    print(f"🔬 Scraping {len(CURATED_EMPLOYERS)} curated organizations (direct ATS)...")
+    all_jobs: list = []
+    for entry in CURATED_EMPLOYERS:
+        if entry["ats"] == "greenhouse":
+            jobs = probe_curated_greenhouse(entry)
+        elif entry["ats"] == "workday":
+            jobs = probe_curated_workday(entry)
+        else:
+            print(f"  ⚠️  Unknown ATS for {entry['name']}: {entry['ats']}")
+            continue
+        if jobs:
+            print(f"  ✅ {entry['name']}: {len(jobs)} role(s)")
+            all_jobs.extend(jobs)
+    return all_jobs
+
+
+# ---------------------------------------------------------------------------
+# LinkedIn Endpoint Scraping
+# ---------------------------------------------------------------------------
+
+LINKEDIN_SEARCH_TERMS = _cfg("search_terms.linkedin", [])
+LINKEDIN_LOOKBACK_SECONDS = 3600
+LINKEDIN_PRIORITY_LOOKBACK_SECONDS = 86400
+LINKEDIN_GEOS = _cfg("locations.linkedin", [])
+
+PRIORITY_EMPLOYER_NAMES = _cfg("employers.priority", [])
+PRIORITY_EMPLOYER_ALLOWLIST = frozenset(
+    re.sub(r'[^a-z0-9]', '', n.lower()) for n in PRIORITY_EMPLOYER_NAMES
+)
+
+
+def _is_priority_company(name: str) -> bool:
+    norm = re.sub(r'[^a-z0-9]', '', (name or "").lower())
+    if not norm:
+        return False
+    return any(b in norm or norm in b for b in PRIORITY_EMPLOYER_ALLOWLIST)
+
+
+_EXCLUDE_COMPANY_TERMS = [str(t).lower() for t in _cfg("employers.exclude", [])]
+
+
+def _is_excluded_company(name: str) -> bool:
+    if not _EXCLUDE_COMPANY_TERMS:
+        return False
+    low = (name or "").lower()
+    return any(t in low for t in _EXCLUDE_COMPANY_TERMS)
+
+
+def _parse_linkedin_cards(html: str) -> tuple[list[dict], int]:
+    import html as html_mod
+    cards = re.split(r'<li[^>]*>', html)[1:]
+    parsed = []
+    raw_count = 0
+    for card in cards:
+        urn = re.search(r'data-entity-urn="urn:li:jobPosting:(\d+)"', card)
+        if not urn:
+            continue
+        raw_count += 1
+        title_m = re.search(r'base-search-card__title[^>]*>\s*([^<]+)', card)
+        company_m = re.search(
+            r'base-search-card__subtitle[^>]*>.*?<a[^>]*>\s*([^<]+)\s*</a>',
+            card, re.DOTALL,
+        ) or re.search(r'base-search-card__subtitle[^>]*>\s*([^<]+)', card)
+        location_m = re.search(r'job-search-card__location[^>]*>\s*([^<]+)', card)
+        time_m = re.search(r'<time[^>]*datetime="([^"]+)"', card)
+        salary_m = re.search(r'job-search-card__salary-info[^>]*>\s*([^<]+)', card)
+
+        title = html_mod.unescape(title_m.group(1).strip()) if title_m else ""
+        company = (
+            html_mod.unescape(re.sub(r'\s+', ' ', company_m.group(1).strip()))
+            if company_m else "Unknown"
+        )
+        location = html_mod.unescape(
+            (location_m.group(1).strip() if location_m else "")
+        ).replace("\n", " ")
+        salary = (
+            re.sub(r'\s+', ' ', html_mod.unescape(salary_m.group(1).strip()))
+            if salary_m else ""
+        )
+        parsed.append({
+            "id": urn.group(1),
+            "company": company,
+            "title": title,
+            "location": location,
+            "date_posted": time_m.group(1) if time_m else "",
+            "salary": salary,
+        })
+    return parsed, raw_count
+
+
+def _linkedin_search(terms: list[str], lookback_seconds: int,
+                     geos: list[dict] | None = None,
+                     max_results: int = 500) -> tuple[list[dict], int]:
+    global _RATE_LIMITED
+    if geos is None:
+        geos = LINKEDIN_GEOS
+    jobs_by_id: dict[str, dict] = {}
+    total_raw_cards = 0
+    consecutive_empty = 0
+    pages_fetched = 0
+    for geo in geos:
+        geo_param = f"&geoId={geo['geoId']}" if geo.get("geoId") else ""
+        for term in terms:
+            for start in range(0, max_results, 10):
+                delay = LINKEDIN_REQUEST_DELAY + random.uniform(0, 2)
+                if _RATE_LIMITED:
+                    delay += 10
+                time.sleep(delay)
+                url = (
+                    "https://www.linkedin.com/jobs-guest/jobs/api/seeMoreJobPostings/search"
+                    f"?keywords={urllib.parse.quote(term)}"
+                    f"&location={urllib.parse.quote(geo['location'])}"
+                    f"{geo_param}"
+                    f"&f_TPR=r{lookback_seconds}"
+                    f"&start={start}"
+                )
+                html = fetch(url)
+                if not html.strip():
+                    consecutive_empty += 1
+                    if consecutive_empty == 1:
+                        wait = 60 + random.uniform(0, 30)
+                        print(f"  ⏸  Empty response at start={start} for \"{term}\" in {geo['name']}; "
+                              f"pausing {wait:.0f}s before retry…")
+                        time.sleep(wait)
+                        html = fetch(url)
+                        if not html.strip():
+                            print(f"  ⛔ Still empty after retry; stopping \"{term}\" in {geo['name']} "
+                                  f"at start={start}")
+                            break
+                    else:
+                        break
+                consecutive_empty = 0
+                parsed, raw_count = _parse_linkedin_cards(html)
+                total_raw_cards += raw_count
+                pages_fetched += 1
+                if pages_fetched % 10 == 0:
+                    print(f"  📊 {pages_fetched} pages fetched | "
+                          f"{len(jobs_by_id)} unique jobs | "
+                          f"{total_raw_cards} raw cards"
+                          f"{' [RATE-LIMITED]' if _RATE_LIMITED else ''}")
+                if not raw_count:
+                    break
+                for p in parsed:
+                    if p["id"] in jobs_by_id:
+                        continue
+                    if not role_is_relevant(p["title"], p["company"]):
+                        continue
+                    jobs_by_id[p["id"]] = {
+                        "company": p["company"],
+                        "title": p["title"],
+                        "location": p["location"],
+                        "url": f"https://www.linkedin.com/jobs/view/{p['id']}/",
+                        "date_posted": p["date_posted"],
+                        "salary": p.get("salary", ""),
+                        "ats": "LinkedIn",
+                    }
+
+    jobs = list(jobs_by_id.values())
+    return jobs, total_raw_cards
+
+
+def _linkedin_search_partition(term: str, location: str, lookback_seconds: int,
+                                max_results: int = 1000,
+                                target_date: str | None = None) -> tuple[list[dict], int, bool]:
+    global _RATE_LIMITED
+    jobs_by_id: dict[str, dict] = {}
+    total_raw_cards = 0
+    consecutive_empty = 0
+    pages_fetched = 0
+
+    for start in range(0, max_results, 10):
+        delay = LINKEDIN_REQUEST_DELAY + random.uniform(0, 2)
+        if _RATE_LIMITED:
+            delay += 10
+        time.sleep(delay)
+
+        url = (
+            "https://www.linkedin.com/jobs-guest/jobs/api/seeMoreJobPostings/search"
+            f"?keywords={urllib.parse.quote(term)}"
+            f"&location={urllib.parse.quote(location)}"
+            f"&f_TPR=r{lookback_seconds}"
+            f"&start={start}"
+        )
+
+        html = fetch(url)
+        if not html.strip():
+            consecutive_empty += 1
+            if consecutive_empty == 1:
+                wait = 30 + random.uniform(0, 15)
+                time.sleep(wait)
+                html = fetch(url)
+                if not html.strip():
+                    break
+            else:
+                break
+
+        consecutive_empty = 0
+        parsed, raw_count = _parse_linkedin_cards(html)
+        total_raw_cards += raw_count
+        pages_fetched += 1
+
+        if not raw_count:
+            break
+
+        for p in parsed:
+            if p["id"] in jobs_by_id:
+                continue
+            if not role_is_relevant(p["title"], p["company"]):
+                continue
+            if target_date and p["date_posted"] != target_date:
+                continue
+
+            jobs_by_id[p["id"]] = {
+                "company": p["company"],
+                "title": p["title"],
+                "location": p["location"],
+                "url": f"https://www.linkedin.com/jobs/view/{p['id']}/",
+                "date_posted": p["date_posted"],
+                "salary": p.get("salary", ""),
+                "ats": "LinkedIn",
+            }
+
+    hit_cap = (total_raw_cards >= max_results - 10)
+    return list(jobs_by_id.values()), total_raw_cards, hit_cap
+
+
+# ---------------------------------------------------------------------------
+# Multi-Resume Gemini Evaluator Engine (Free Tier)
+# ---------------------------------------------------------------------------
+
+def _load_resumes() -> dict[str, str]:
+    """Load candidate resumes from GitHub Secrets or environment variables."""
+    resumes = {}
+    for key, val in os.environ.items():
+        if key.startswith("RESUME_") and val.strip():
+            resume_label = key.removeprefix("RESUME_").replace("_", " ").title()
+            resumes[resume_label] = val.strip()
+
+    if not resumes:
+        resumes["Default Profile"] = "Senior IT Leader with experience in tech infrastructure, management, and game studio operations."
+
+    return resumes
+
+
+def evaluate_job_with_gemini(job: dict, resumes: dict[str, str]) -> dict:
+    """Uses Google's free Gemini API to evaluate a job against all provided resumes."""
+    gemini_key = os.getenv("GEMINI_API_KEY")
+    if not gemini_key:
+        return {"best_resume": "N/A", "fit_score": 0, "reasons": ["GEMINI_API_KEY secret missing."]}
+
+    prompt = f"""
+    You are an expert executive tech recruiter and resume evaluator.
+    Compare the following Job Posting against all provided candidate resumes.
+
+    Job Title: {job.get('title')}
+    Company: {job.get('company')}
+    Location: {job.get('location')}
+
+    Candidate Resumes:
+    {json.dumps(resumes, indent=2)}
+
+    Task:
+    1. Identify which resume is the BEST fit for this job.
+    2. Calculate a fit_score (integer from 0 to 100).
+    3. Provide 2-3 specific bullet points explaining the match or gaps.
+
+    Respond STRICTLY in JSON format:
+    {{
+        "best_resume": "<matching_resume_key>",
+        "fit_score": <0-100 integer>,
+        "reasons": ["<reason 1>", "<reason 2>"]
+    }}
+    """
+
+    url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={gemini_key}"
+    payload = {
+        "contents": [{"parts": [{"text": prompt}]}],
+        "generationConfig": {"response_mime_type": "application/json"}
+    }
+
+    req = Request(url, data=json.dumps(payload).encode("utf-8"), headers={"Content-Type": "application/json"})
+
+    try:
+        with urlopen(req, timeout=20) as resp:
+            data = json.loads(resp.read().decode("utf-8"))
+            result_text = data['candidates'][0]['content']['parts'][0]['text']
+            return json.loads(result_text)
+    except Exception as e:
+        print(f"  ⚠️ Gemini evaluation error for {job.get('title')}: {e}")
+        return {"best_resume": "Error", "fit_score": 0, "reasons": [str(e)]}
+
+
+def process_and_score_jobs(jobs: list[dict]) -> list[dict]:
+    """Scrapes jobs, scores them against resumes with Gemini, and filters top matches."""
+    resumes = _load_resumes()
+    print(f"\n🤖 Running Gemini Evaluation across {len(resumes)} resume profile(s)...")
+
+    scored_jobs = []
+    min_fit = int(_cfg("notify.min_fit", 75))
+
+    for idx, job in enumerate(jobs):
+        print(f"  [{idx+1}/{len(jobs)}] Scoring: {job['title']} at {job['company']}")
+
+        # Gemini Free Tier rate limit guard: 15 calls/min -> 4 second delay
+        time.sleep(4.0)
+
+        eval_res = evaluate_job_with_gemini(job, resumes)
+
+        job["best_resume"] = eval_res.get("best_resume", "None")
+        job["fit_score"] = eval_res.get("fit_score", 0)
+        job["reasons"] = eval_res.get("reasons", [])
+
+        if job["fit_score"] >= min_fit:
+            scored_jobs.append(job)
+
+    scored_jobs.sort(key=lambda x: x["fit_score"], reverse=True)
+    return scored_jobs
+
+
+# ---------------------------------------------------------------------------
+# Pipeline Entrypoint
+# ---------------------------------------------------------------------------
+
+if __name__ == "__main__":
+    print("🚀 Starting Job Scraper Engine...")
+
+    # 1. Scrape Direct ATS
+    ats_jobs = scrape_curated_employers()
+
+    # 2. Scrape LinkedIn
+    terms = _cfg("search_terms.linkedin", ["Director of IT"])
+    linkedin_jobs, _ = _linkedin_search(terms, lookback_seconds=LINKEDIN_PRIORITY_LOOKBACK_SECONDS)
+
+    # Merge and Deduplicate Scraped Roles
+    raw_jobs = ats_jobs + linkedin_jobs
+    deduped = {j["url"]: j for j in raw_jobs}.values()
+    print(f"\n📦 Scraped {len(deduped)} total unique candidate roles.")
+
+    # 3. Score Jobs with Gemini AI against loaded Resumes
+    scored_matches = process_and_score_jobs(list(deduped))
+
+    # 4. Save Results to Output JSON
+    output_path = os.path.join(OUTPUT_DIR, "scored_jobs.json")
+    with open(output_path, "w", encoding="utf-8") as f:
+        json.dump(scored_matches, f, indent=2)
+
+    print(f"\n✅ Pipeline Complete! {len(scored_matches)} high-fit jobs exported to {output_path}")
