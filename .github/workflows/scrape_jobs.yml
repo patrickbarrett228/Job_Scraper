@@ -46,10 +46,10 @@ jobs:
           PUSHOVER_TOKEN: ${{ secrets.PUSHOVER_TOKEN }}
           PUSHOVER_USER: ${{ secrets.PUSHOVER_USER }}
           NOTIFY_MIN_FIT: ${{ vars.NOTIFY_MIN_FIT }}
-          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
-          RESUME_IT_DIRECTOR: ${{ secrets.RESUME_IT_DIRECTOR }}
-          RESUME_IT_MANAGER: ${{ secrets.RESUME_IT_MANAGER }}
-          RESUME_ASSOCIATE_PRODUCT_MANAGER: ${{ secrets.RESUME_ASSOCIATE_PRODUCT_MANAGER }}
+   #       GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+  #        RESUME_IT_DIRECTOR: ${{ secrets.RESUME_IT_DIRECTOR }}
+ #         RESUME_IT_MANAGER: ${{ secrets.RESUME_IT_MANAGER }}
+#          RESUME_ASSOCIATE_PRODUCT_MANAGER: ${{ secrets.RESUME_ASSOCIATE_PRODUCT_MANAGER }}
 
       - name: Record workflow run
         run: |
