@@ -1,0 +1,140 @@
+{
+  "profile": {
+    "title": "IT Leadership & Operations Job Tracker",
+    "subtitle": "Remote · United States",
+    "emoji": "🖥️"
+  },
+
+  "keywords": {
+    "include": [
+      "it director", "director of it", "director of information technology", "director of technology", "it operations manager",
+      "manager of it operations", "it manager", "information technology manager", "it service delivery manager", "it infrastructure manager", 
+      "director of it operations", "head of it", "head of information technology", "it program manager", "it portfolio manager", 
+      "technology operations manager", "director of technology operations", "vp of information technology", "vp of it", "it infrastructure director",
+      "director of cloud infrastructure", "it service desk manager", "managed services manager", "it governance manager", "sr it manager",
+      "senior it manager", "senior manager it operations", "sr manager information technology"
+    ],
+    "exclude": [
+      "intern", "internship", "co-op", "trainee", "junior", "entry level", "help desk technician", "desktop support technician", "tier 1",
+      "tier 2", "software engineer", "full stack developer", "data scientist", "sales manager", "account executive"
+    ],
+  },
+
+  "search_terms": {
+    "linkedin": [
+      "IT Director", "Director of Information Technology", "IT Operations Manager", "Director of Technology", "Head of IT",
+      "IT Infrastructure Manager", "IT Service Delivery Manager", "IT Program Manager", "Director IT Operations", "VP Information Technology",
+      "Senior IT Manager", "Technology Operations Manager", "IT Portfolio Manager", "Managed Services Manager", "Director Cloud Infrastructure"
+    ],
+    "indeed": [
+      "IT Director", "Director Information Technology", "IT Operations Manager", "Head of IT", "IT Infrastructure Manager", "IT Program Manager",
+      "Senior IT Manager", "Director Technology Operations"
+    ],
+    "glassdoor": [
+      "IT Director", "Director Information Technology", "IT Operations Manager", "Head of IT", "IT Infrastructure Manager", "IT Program Manager",
+      "Senior IT Manager", "Director Technology Operations"
+    ],
+    "ziprecruiter": [
+      "IT Director", "Director Information Technology", "IT Operations Manager", "Head of IT", "IT Infrastructure Manager", "IT Program Manager",
+      "Senior IT Manager", "Director Technology Operations"
+    ],
+    "google_jobs": [
+      "IT Director", "Director Information Technology", "IT Operations Manager", "Head of IT", "IT Infrastructure Manager", "IT Program Manager",
+      "Senior IT Manager", "Director Technology Operations"
+    ],
+    "hiring_cafe": [
+      "IT Director", "Director Information Technology", "IT Operations Manager", "Head of IT", "IT Infrastructure Manager", "IT Program Manager",
+      "Senior IT Manager", "Director Technology Operations"
+    ]
+  },
+
+  "locations": {
+    "linkedin": [
+      { "name": "Remote", "location": "United States", "geoId": "" }
+    ],
+    "indeed": [
+      { "location": "Remote", "country": "USA" }
+    ],
+    "glassdoor": [
+      { "location": "Remote",   "country": "USA" }
+
+    ],
+    "ziprecruiter": [
+      { "location": "Remote",   "country": "USA" }
+    ],
+    "google_jobs": [
+      { "location": "Remote",   "country": "USA" }
+    ],
+    "hiring_cafe": [
+      { "location": "United States" }
+    ],
+    "_linkedin_partitions_comment": "Optional. Used by --linkedin-emit-matrix / --linkedin-backfill-partition for parallel backfill. Each state gets one matrix worker per search term. High-volume states can be day-sliced to work around LinkedIn's ~1000 result/query cap. Leave empty to use single-run backfill (--linkedin-backfill).",
+    "linkedin_partitions": {
+      "states": [],
+      "high_volume": {
+        "locations": [],
+        "day_slices": true
+      }
+    }
+  },
+
+  "location_filter": {
+    "_comment": "Case-insensitive substrings matched against a job's location text. Used to post-filter boards that don't support geo-scoping at the API level: the curated direct-ATS sweep, and NEOGOV/GovernmentJobs.com (a nationwide board). Keep this in sync with your locations.* entries above.",
+    "terms": [
+      "remote"
+    ]
+  },
+
+  "google_jobs": {
+    "queries": [],
+    "serpapi_api_key": "",
+    "oxylabs_username": "",
+    "oxylabs_password": ""
+  },
+
+  "jobspy": {
+    "proxies": [],
+    "user_agent": ""
+  },
+
+  "hiring_cafe": {
+    "max_pages": 3
+  },
+
+  "employers": {
+    "priority": [],
+    "exclude": []
+  },
+
+  "priority_topics": {
+    "_comment": "Optional. Roles touching these get a gold ★ + a 'Priority topics' filter on the dashboard. [name, regex] pairs.",
+    "terms": [
+      ["ITIL / ITSM", "\b(itil|itsm|service management|service delivery)\b"],
+      ["Cloud & M335 Governance", "\b(cloud|m365|microsoft 365|azure|saas)\b"],
+      ["Agile & Scrum", "\b(agile|scrum|csm|capm|pmp|waterfall)\b"],
+      ["Process Automation", "\b(automation|power automate|powerapps|power platform)\b"],
+      ["AI Governance & Risk", "\b(ai governance|ai policy|risk management|security clearance|top secret)\b"]
+    ]
+  },
+
+  "role_categories": {
+    "terms": [
+      ["Executive IT Leadership", "\b(vp|vice president|head of it|head of information technology|chief information officer|cio)\b"],
+      ["IT Director", "\b(director of it|it director|director of information technology|director of technology|it infrastructure director)\b"],
+      ["IT Operations Management", "\b(it operations manager|manager of it operations|technology operations manager|operations service manager)\b"],
+      ["General IT Management", "\b(it manager|information technology manager|sr it manager|senior it manager|it service desk manager)\b"],
+      ["IT Service & Infrastructure Delivery", "\b(service delivery manager|infrastructure manager|managed services manager|it delivery manager)\b"],
+      ["IT Program & Portfolio Management", "\b(it program manager|it portfolio manager|technical program manager)\b"]
+    ]
+  },
+
+  "notify": {
+    "_comment": "Pushover phone alerts (optional; needs PUSHOVER_TOKEN/USER secrets). Notify when a new role is a priority-topic OR scores at/above min_fit.",
+    "min_fit": 75,
+    "weekly_digest": {
+      "_comment": "Optional weekly Pushover brief. Prefer enabling via the WEEKLY_DIGEST_PUSHOVER repository variable so forks stay quiet by default.",
+      "enabled": false,
+      "days": 7
+    }
+  }
+}
