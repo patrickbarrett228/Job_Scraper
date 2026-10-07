@@ -37,7 +37,7 @@ jobs:
       # it GitHub rejects the push with "refusing to allow a GitHub App to
       # create or update workflow ... without `workflows` permission",
       # even though contents:write is already granted.
-      workflows: write
+      actions: write
 
     steps:
       - name: Checkout repo
