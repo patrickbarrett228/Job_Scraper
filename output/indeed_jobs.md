@@ -1,5 +1,5 @@
-# 🟦 Indeed — Environmental / Toxicology Roles
-*Last updated: 2026-10-08 10:56 UTC*
+# 🟦 Indeed — IT Leadership & Operations Roles
+*Last updated: 2026-10-08 23:58 UTC*
 
 **0 new role(s)** since last run · 0 total in last 24h
 
