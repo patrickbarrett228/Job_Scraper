@@ -17,7 +17,7 @@
     "exclude": [
       "intern", "internship", "co-op", "trainee", "junior", "entry level", "help desk technician", "desktop support technician", "tier 1",
       "tier 2", "software engineer", "full stack developer", "data scientist", "sales manager", "account executive"
-    ],
+    ]
   },
 
   "search_terms": {
@@ -110,7 +110,7 @@
     "_comment": "Optional. Roles touching these get a gold ★ + a 'Priority topics' filter on the dashboard. [name, regex] pairs.",
     "terms": [
       ["ITIL / ITSM", "\b(itil|itsm|service management|service delivery)\b"],
-      ["Cloud & M335 Governance", "\b(cloud|m365|microsoft 365|azure|saas)\b"],
+      ["Cloud & M365 Governance", "\b(cloud|m365|microsoft 365|azure|saas)\b"],
       ["Agile & Scrum", "\b(agile|scrum|csm|capm|pmp|waterfall)\b"],
       ["Process Automation", "\b(automation|power automate|powerapps|power platform)\b"],
       ["AI Governance & Risk", "\b(ai governance|ai policy|risk management|security clearance|top secret)\b"]
