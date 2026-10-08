@@ -22,29 +22,22 @@
 
   "search_terms": {
     "linkedin": [
-      "IT Director", "Director of Information Technology", "IT Operations Manager", "Director of Technology", "Head of IT",
-      "IT Infrastructure Manager", "IT Service Delivery Manager", "IT Program Manager", "Director IT Operations", "VP Information Technology",
-      "Senior IT Manager", "Technology Operations Manager", "IT Portfolio Manager", "Managed Services Manager", "Director Cloud Infrastructure"
+      "IT Director", "Director of Information Technology", "IT Operations Manager", "IT Service Delivery Manager", "IT Program Manager"
     ],
     "indeed": [
-      "IT Director", "Director Information Technology", "IT Operations Manager", "Head of IT", "IT Infrastructure Manager", "IT Program Manager",
-      "Senior IT Manager", "Director Technology Operations"
+      "IT Director", "Director of Information Technology", "IT Operations Manager", "IT Service Delivery Manager", "IT Program Manager"
     ],
     "glassdoor": [
-      "IT Director", "Director Information Technology", "IT Operations Manager", "Head of IT", "IT Infrastructure Manager", "IT Program Manager",
-      "Senior IT Manager", "Director Technology Operations"
+      "IT Director", "Director of Information Technology", "IT Operations Manager", "IT Service Delivery Manager", "IT Program Manager"
     ],
     "ziprecruiter": [
-      "IT Director", "Director Information Technology", "IT Operations Manager", "Head of IT", "IT Infrastructure Manager", "IT Program Manager",
-      "Senior IT Manager", "Director Technology Operations"
+      "IT Director", "Director of Information Technology", "IT Operations Manager", "IT Service Delivery Manager", "IT Program Manager"
     ],
     "google_jobs": [
-      "IT Director", "Director Information Technology", "IT Operations Manager", "Head of IT", "IT Infrastructure Manager", "IT Program Manager",
-      "Senior IT Manager", "Director Technology Operations"
+      "IT Director", "Director of Information Technology", "IT Operations Manager", "IT Service Delivery Manager", "IT Program Manager"
     ],
     "hiring_cafe": [
-      "IT Director", "Director Information Technology", "IT Operations Manager", "Head of IT", "IT Infrastructure Manager", "IT Program Manager",
-      "Senior IT Manager", "Director Technology Operations"
+      "IT Director", "Director of Information Technology", "IT Operations Manager", "IT Service Delivery Manager", "IT Program Manager"
     ]
   },
 
