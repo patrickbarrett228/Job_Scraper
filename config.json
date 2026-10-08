@@ -50,7 +50,7 @@
 
   "locations": {
     "linkedin": [
-      { "name": "Remote", "location": "United States", "geoId": "" }
+      { "name": "Remote", "location": "United States", "geoId": "103644278" }
     ],
     "indeed": [
       { "location": "Remote", "country": "USA" }
