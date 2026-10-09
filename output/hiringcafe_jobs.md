@@ -1,5 +1,5 @@
 # ☕ HiringCafe — IT Leadership & Operations Roles
-*Last updated: 2026-10-09 01:42 UTC*
+*Last updated: 2026-10-09 08:25 UTC*
 
 **0 new role(s)** since last run · 0 total in last 30d
 
