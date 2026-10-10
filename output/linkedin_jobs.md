@@ -1,6 +1,8 @@
 # 🔥 LinkedIn — IT Leadership & Operations Roles
-*Last updated: 2026-10-09 20:11 UTC*
+*Last updated: 2026-10-10 00:06 UTC*
 
-**0 new role(s)** since last run · 0 total in last 1h
+**1 new role(s)** since last run · 1 total in last 1h
 
-No new roles since the last run.
+### [ITGC Audit Manager](https://www.linkedin.com/jobs/view/4477896134/) — Damco Solutions
+- 📍 **Location:** New York, United States
+- 🕒 **Posted:** 2026-10-09
