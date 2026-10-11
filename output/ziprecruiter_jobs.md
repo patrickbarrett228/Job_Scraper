@@ -1,5 +1,5 @@
 # 🟧 ZipRecruiter — IT Leadership & Operations Roles
-*Last updated: 2026-10-11 20:25 UTC*
+*Last updated: 2026-10-11 23:48 UTC*
 
 **0 new role(s)** since last run · 0 total in last 24h
 
